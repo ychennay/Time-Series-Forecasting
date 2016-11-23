@@ -1,0 +1,41 @@
+# this code is implemented directly from Mastering Predictive Analytics with R by Rui Miguel Forte from his chapter on time series forecasting,
+# page 303-304. I have adapted it here in order to make optimized ARIMA forecasts of daily revenue
+
+#function to calculate aic
+getTSModelAIC <- function(ts_data, p,d,q){
+  ts_model <- arima(ts_data, order=c(p,d,q), method = "ML")
+  return(ts_model$aic)
+}
+
+#catch exceptions, convergence errors, etc.
+getTSModelAICSafe <- function(ts_data, p,d,q){
+  result = tryCatch({
+    getTSModelAIC(ts_data, p,d,q)}, error = function(e){
+      Inf
+    }  )}
+
+#import data
+df <- read.csv("revenue_adj.csv")
+
+#set number of significant digits
+options(scipen=5)
+
+#convert to timeseries object
+df.ts = ts(df, frequency= 1)
+plot(df.ts)
+
+#has our average daily revenue changed in a statistically significant way?
+adf.test(df.ts, alternative = "stationary")
+
+#plot our acf
+acf(diff(df.ts))
+
+#define the function to optimize and select the best ARIMA function
+optimizeARIMA <- function(df.ts){
+d <-  0:3
+p <- 0:8
+q <- 0:8
+
+forecast_models <- expand.grid(p = p, d = d, q = q)
+forecast_models$aic <- mapply(function(x,y,z) getTSModelAICSafe(df.ts, x,y,z), forecast_models$p, forecast_models$d, forecast_models$q)
+return(subset(forecast_models, aic == min(aic)))}
